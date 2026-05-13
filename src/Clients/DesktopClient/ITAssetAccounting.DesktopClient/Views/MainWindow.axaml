@@ -1,0 +1,24 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="ITAssetAccounting.DesktopClient.Views.MainWindow"
+        Width="980" Height="640" Title="IT Asset Accounting Desktop">
+    <Grid RowDefinitions="Auto,Auto,*" Margin="18" RowSpacing="14">
+        <Border Grid.Row="0" CornerRadius="12" Background="#EEF2FF" Padding="16">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <TextBlock Text="Email" VerticalAlignment="Center" />
+                <TextBox Width="220" Text="{Binding Email}" />
+                <TextBlock Text="Password" VerticalAlignment="Center" />
+                <TextBox Width="160" PasswordChar="*" Text="{Binding Password}" />
+                <Button Content="Войти" Command="{Binding LoginCommand}" />
+                <TextBlock Text="{Binding Status}" VerticalAlignment="Center" />
+            </StackPanel>
+        </Border>
+        <Border Grid.Row="1" CornerRadius="12" Background="#F8FAFC" Padding="16">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <TextBox Width="360" Watermark="Поиск оборудования" Text="{Binding Search}" />
+                <Button Content="Обновить" Command="{Binding LoadCommand}" />
+            </StackPanel>
+        </Border>
+        <DataGrid Grid.Row="2" ItemsSource="{Binding Equipment}" AutoGenerateColumns="True" IsReadOnly="True" />
+    </Grid>
+</Window>

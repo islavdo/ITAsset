@@ -1,0 +1,40 @@
+@page "/login"
+@inject ApiClient Api
+@inject AuthState Auth
+@inject NavigationManager Nav
+
+<div class="card" style="max-width:480px;margin:auto">
+    <h1>Вход в систему</h1>
+    <EditForm Model="this" OnValidSubmit="LoginAsync">
+        <DataAnnotationsValidator />
+        <div class="form-grid" style="grid-template-columns:1fr">
+            <input placeholder="Email" @bind="email" />
+            <input placeholder="Пароль" type="password" @bind="password" />
+            <button type="submit">Войти</button>
+        </div>
+    </EditForm>
+    @if (!string.IsNullOrWhiteSpace(error))
+    {
+        <p class="error">@error</p>
+    }
+    <p>Демо: admin@it.local / Admin123!</p>
+</div>
+
+@code {
+    private string email = "admin@it.local";
+    private string password = "Admin123!";
+    private string? error;
+
+    private async Task LoginAsync()
+    {
+        error = null;
+        var token = await Api.LoginAsync(new LoginRequest(email, password));
+        if (token is null)
+        {
+            error = "Неверный логин или пароль";
+            return;
+        }
+        await Auth.SetAsync(token);
+        Nav.NavigateTo("/");
+    }
+}

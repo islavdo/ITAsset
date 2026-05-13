@@ -1,0 +1,18 @@
+@inherits LayoutComponentBase
+@inject AuthState Auth
+
+<div class="shell">
+    <aside class="sidebar">
+        <div class="logo">IT Asset</div>
+        <nav class="nav">
+            <NavLink href="/">Dashboard</NavLink>
+            <NavLink href="/equipment">Оборудование</NavLink>
+            <NavLink href="/maintenance">Заявки</NavLink>
+            <NavLink href="/login">Вход</NavLink>
+        </nav>
+        <p style="opacity:.8;margin-top:24px">@Auth.CurrentUser?.FullName</p>
+    </aside>
+    <main class="content">
+        @Body
+    </main>
+</div>

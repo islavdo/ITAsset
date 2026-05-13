@@ -1,0 +1,63 @@
+@page "/maintenance"
+@inject ApiClient Api
+@inject AuthState Auth
+
+<h1>Заявки на обслуживание</h1>
+<div class="card">
+    <div class="toolbar">
+        <input placeholder="Поиск" @bind="filter.Search" />
+        <button @onclick="LoadAsync">Найти</button>
+    </div>
+    <table>
+        <thead><tr><th>ID</th><th>Оборудование</th><th>Тема</th><th>Статус</th><th>Приоритет</th></tr></thead>
+        <tbody>
+        @foreach (var r in items)
+        {
+            <tr><td>@r.Id</td><td>@r.EquipmentId</td><td>@r.Title</td><td><span class="badge">@r.Status</span></td><td>@r.Priority</td></tr>
+        }
+        </tbody>
+    </table>
+</div>
+<div class="card">
+    <h2>Создать заявку</h2>
+    <div class="form-grid">
+        <input type="number" placeholder="ID оборудования" @bind="create.EquipmentId" />
+        <input placeholder="Тема" @bind="create.Title" />
+        <select @bind="create.Priority">
+            @foreach (var p in Enum.GetValues<MaintenancePriority>()) { <option value="@p">@p</option> }
+        </select>
+        <textarea placeholder="Описание" @bind="create.Description"></textarea>
+        <button @onclick="CreateAsync">Создать</button>
+    </div>
+</div>
+
+@code {
+    private MaintenanceFilter filter = new() { Page = 1, PageSize = 20 };
+    private List<MaintenanceRequestDto> items = new();
+    private MaintenanceForm create = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Auth.LoadAsync();
+        await LoadAsync();
+    }
+    private async Task LoadAsync()
+    {
+        var page = await Api.GetMaintenanceAsync(filter);
+        items = page?.Items.ToList() ?? new();
+    }
+    private async Task CreateAsync()
+    {
+        await Api.CreateMaintenanceAsync(new MaintenanceCreateRequest(create.EquipmentId, create.Title, create.Description, create.Priority));
+        create = new MaintenanceForm();
+        await LoadAsync();
+    }
+
+    private class MaintenanceForm
+    {
+        public int EquipmentId { get; set; } = 1;
+        public string Title { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public MaintenancePriority Priority { get; set; } = MaintenancePriority.Normal;
+    }
+}

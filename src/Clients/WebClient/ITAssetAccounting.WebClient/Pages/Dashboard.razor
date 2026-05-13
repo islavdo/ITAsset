@@ -1,0 +1,39 @@
+@page "/"
+@inject ApiClient Api
+@inject AuthState Auth
+
+<h1>Панель управления</h1>
+@if (dashboard is null)
+{
+    <div class="card">Загрузка dashboard...</div>
+}
+else
+{
+    <div class="grid">
+        <div class="card"><h3>Всего</h3><h2>@dashboard.TotalEquipment</h2></div>
+        <div class="card"><h3>На складе</h3><h2>@dashboard.InStock</h2></div>
+        <div class="card"><h3>Выдано</h3><h2>@dashboard.Assigned</h2></div>
+        <div class="card"><h3>В ремонте</h3><h2>@dashboard.InRepair</h2></div>
+    </div>
+    <div class="card">
+        <h2>По категориям</h2>
+        <table>
+            <thead><tr><th>Категория</th><th>Количество</th></tr></thead>
+            <tbody>
+            @foreach (var item in dashboard.ByCategory)
+            {
+                <tr><td>@item.CategoryName</td><td>@item.Count</td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private DashboardDto? dashboard;
+    protected override async Task OnInitializedAsync()
+    {
+        await Auth.LoadAsync();
+        dashboard = await Api.GetDashboardAsync();
+    }
+}

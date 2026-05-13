@@ -1,0 +1,33 @@
+@page "/equipment/{Id:int}"
+@inject HttpClient Http
+@inject AuthState Auth
+
+<h1>Карточка оборудования #@Id</h1>
+<div class="card">
+    <h2>Файлы</h2>
+    <InputFile OnChange="UploadAsync" />
+    @if (!string.IsNullOrWhiteSpace(message)) { <p class="success">@message</p> }
+    @if (!string.IsNullOrWhiteSpace(error)) { <p class="error">@error</p> }
+</div>
+
+@code {
+    [Parameter] public int Id { get; set; }
+    private string? message;
+    private string? error;
+
+    private async Task UploadAsync(InputFileChangeEventArgs e)
+    {
+        await Auth.LoadAsync();
+        if (!string.IsNullOrWhiteSpace(Auth.AccessToken))
+        {
+            Http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", Auth.AccessToken);
+        }
+        var file = e.File;
+        using var content = new MultipartFormDataContent();
+        var stream = file.OpenReadStream(10 * 1024 * 1024);
+        content.Add(new StreamContent(stream), "file", file.Name);
+        content.Add(new StringContent(FileKind.Photo.ToString()), "kind");
+        var response = await Http.PostAsync($"files/equipment/{Id}", content);
+        if (response.IsSuccessStatusCode) message = "Файл загружен"; else error = "Ошибка загрузки файла";
+    }
+}

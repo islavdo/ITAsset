@@ -1,0 +1,118 @@
+@page "/equipment"
+@inject ApiClient Api
+@inject AuthState Auth
+
+<h1>Оборудование</h1>
+<div class="card">
+    <div class="toolbar">
+        <input placeholder="Поиск по названию, модели, инв. номеру" @bind="filter.Search" />
+        <select @bind="statusText">
+            <option value="">Все статусы</option>
+            @foreach (var status in Enum.GetValues<EquipmentStatus>())
+            {
+                <option value="@status.ToString()">@status</option>
+            }
+        </select>
+        <button @onclick="LoadAsync">Найти</button>
+    </div>
+    @if (!string.IsNullOrWhiteSpace(error)) { <p class="error">@error</p> }
+    <table>
+        <thead><tr><th>Инв. номер</th><th>Название</th><th>Модель</th><th>Локация</th><th>Статус</th></tr></thead>
+        <tbody>
+        @foreach (var item in items)
+        {
+            <tr>
+                <td><a href="/equipment/@item.Id">@item.InventoryNumber</a></td>
+                <td>@item.Name</td><td>@item.Model</td><td>@item.LocationName</td><td><span class="badge">@item.Status</span></td>
+            </tr>
+        }
+        </tbody>
+    </table>
+    <div class="toolbar" style="margin-top:16px">
+        <button class="secondary" disabled="@(filter.Page <= 1)" @onclick="Prev">Назад</button>
+        <span>Страница @filter.Page из @totalPages</span>
+        <button class="secondary" disabled="@(filter.Page >= totalPages)" @onclick="Next">Вперед</button>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Добавить оборудование</h2>
+    <EditForm Model="create" OnValidSubmit="CreateAsync">
+        <div class="form-grid">
+            <input placeholder="Инвентарный номер" @bind="create.InventoryNumber" required />
+            <input placeholder="Название" @bind="create.Name" required />
+            <input placeholder="Модель" @bind="create.Model" />
+            <input placeholder="Серийный номер" @bind="create.SerialNumber" />
+            <select @bind="create.CategoryId">
+                @foreach (var c in categories) { <option value="@c.Id">@c.Name</option> }
+            </select>
+            <select @bind="create.LocationId">
+                @foreach (var l in locations) { <option value="@l.Id">@l.Name</option> }
+            </select>
+            <input placeholder="Цена" type="number" @bind="create.Price" />
+            <button type="submit">Сохранить</button>
+        </div>
+    </EditForm>
+</div>
+
+@code {
+    private EquipmentFilter filter = new() { Page = 1, PageSize = 10 };
+    private string statusText = string.Empty;
+    private List<EquipmentDto> items = new();
+    private IReadOnlyCollection<CategoryDto> categories = Array.Empty<CategoryDto>();
+    private IReadOnlyCollection<LocationDto> locations = Array.Empty<LocationDto>();
+    private EquipmentForm create = new();
+    private int totalPages = 1;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Auth.LoadAsync();
+        categories = await Api.GetCategoriesAsync();
+        locations = await Api.GetLocationsAsync();
+        if (categories.Any()) create.CategoryId = categories.First().Id;
+        if (locations.Any()) create.LocationId = locations.First().Id;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        error = null;
+        try
+        {
+            filter.Status = Enum.TryParse<EquipmentStatus>(statusText, out var parsed) ? parsed : null;
+            var page = await Api.GetEquipmentAsync(filter);
+            items = page?.Items.ToList() ?? new();
+            totalPages = page?.TotalPages ?? 1;
+        }
+        catch (Exception ex)
+        {
+            error = "Ошибка загрузки: " + ex.Message;
+        }
+    }
+    private async Task Prev() { filter.Page--; await LoadAsync(); }
+    private async Task Next() { filter.Page++; await LoadAsync(); }
+    private async Task CreateAsync()
+    {
+        if (string.IsNullOrWhiteSpace(create.InventoryNumber) || string.IsNullOrWhiteSpace(create.Name))
+        {
+            error = "Инвентарный номер и название обязательны"; return;
+        }
+        var request = new EquipmentCreateRequest(create.InventoryNumber, create.Name, create.Model, create.SerialNumber, create.CategoryId, create.LocationId, null, create.Price);
+        await Api.CreateEquipmentAsync(request);
+        create.InventoryNumber = create.Name = create.Model = create.SerialNumber = string.Empty;
+        create.Price = null;
+        await LoadAsync();
+    }
+
+    private class EquipmentForm
+    {
+        public string InventoryNumber { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string Model { get; set; } = string.Empty;
+        public string SerialNumber { get; set; } = string.Empty;
+        public int CategoryId { get; set; }
+        public int LocationId { get; set; }
+        public decimal? Price { get; set; }
+    }
+}
