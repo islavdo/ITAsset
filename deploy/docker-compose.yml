@@ -1,0 +1,127 @@
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  identity-service:
+    build:
+      context: ..
+      dockerfile: src/Services/IdentityService/ITAssetAccounting.IdentityService/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__IdentityDb: Data Source=/data/identity.db
+      ConnectionStrings__Redis: redis:6379
+      Jwt__SigningKey: DEV_ONLY_CHANGE_TO_64_SYMBOLS_MINIMUM_SECRET_FOR_JWT_SIGNING
+    volumes:
+      - identity-data:/data
+    depends_on:
+      - redis
+
+  equipment-service:
+    build:
+      context: ..
+      dockerfile: src/Services/EquipmentService/ITAssetAccounting.EquipmentService/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__EquipmentDb: Data Source=/data/equipment.db
+      ConnectionStrings__Redis: redis:6379
+      Jwt__SigningKey: DEV_ONLY_CHANGE_TO_64_SYMBOLS_MINIMUM_SECRET_FOR_JWT_SIGNING
+    volumes:
+      - equipment-data:/data
+    depends_on:
+      - redis
+      - identity-service
+
+  maintenance-service:
+    build:
+      context: ..
+      dockerfile: src/Services/MaintenanceService/ITAssetAccounting.MaintenanceService/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__MaintenanceDb: Data Source=/data/maintenance.db
+      ConnectionStrings__Redis: redis:6379
+      Jwt__SigningKey: DEV_ONLY_CHANGE_TO_64_SYMBOLS_MINIMUM_SECRET_FOR_JWT_SIGNING
+    volumes:
+      - maintenance-data:/data
+    depends_on:
+      - redis
+      - identity-service
+
+  file-service:
+    build:
+      context: ..
+      dockerfile: src/Services/FileService/ITAssetAccounting.FileService/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__FileDb: Data Source=/data/files.db
+      ConnectionStrings__Redis: redis:6379
+      FileStorage__RootPath: /storage
+      Jwt__SigningKey: DEV_ONLY_CHANGE_TO_64_SYMBOLS_MINIMUM_SECRET_FOR_JWT_SIGNING
+    volumes:
+      - file-data:/data
+      - file-storage:/storage
+    depends_on:
+      - redis
+      - identity-service
+
+  report-service:
+    build:
+      context: ..
+      dockerfile: src/Services/ReportService/ITAssetAccounting.ReportService/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__Redis: redis:6379
+      EquipmentService__BaseUrl: http://equipment-service:8080
+      Jwt__SigningKey: DEV_ONLY_CHANGE_TO_64_SYMBOLS_MINIMUM_SECRET_FOR_JWT_SIGNING
+    depends_on:
+      - redis
+      - equipment-service
+
+  gateway:
+    build:
+      context: ..
+      dockerfile: src/Services/Gateway/ITAssetAccounting.Gateway/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ReverseProxy__Clusters__identity__Destinations__d1__Address: http://identity-service:8080/
+      ReverseProxy__Clusters__equipment__Destinations__d1__Address: http://equipment-service:8080/
+      ReverseProxy__Clusters__maintenance__Destinations__d1__Address: http://maintenance-service:8080/
+      ReverseProxy__Clusters__files__Destinations__d1__Address: http://file-service:8080/
+      ReverseProxy__Clusters__reports__Destinations__d1__Address: http://report-service:8080/
+    depends_on:
+      - identity-service
+      - equipment-service
+      - maintenance-service
+      - file-service
+      - report-service
+
+  web-client:
+    build:
+      context: ..
+      dockerfile: src/Clients/WebClient/ITAssetAccounting.WebClient/Dockerfile
+    depends_on:
+      - gateway
+
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - web-client
+      - gateway
+
+volumes:
+  identity-data:
+  equipment-data:
+  maintenance-data:
+  file-data:
+  file-storage:
