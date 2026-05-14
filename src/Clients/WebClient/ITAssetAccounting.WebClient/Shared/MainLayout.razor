@@ -1,5 +1,7 @@
 @inherits LayoutComponentBase
+@implements IDisposable
 @inject AuthState Auth
+@inject NavigationManager Nav
 
 <div class="shell">
     <aside class="sidebar">
@@ -8,11 +10,46 @@
             <NavLink href="/">Dashboard</NavLink>
             <NavLink href="/equipment">Оборудование</NavLink>
             <NavLink href="/maintenance">Заявки</NavLink>
-            <NavLink href="/login">Вход</NavLink>
         </nav>
-        <p style="opacity:.8;margin-top:24px">@Auth.CurrentUser?.FullName</p>
+        <div class="user-menu">
+            <button class="user-menu-trigger" type="button">@AccountLabel</button>
+            <div class="user-menu-panel">
+                @if (IsAuthenticated)
+                {
+                    <button class="secondary" type="button" @onclick="LogoutAsync">Выйти</button>
+                }
+                else
+                {
+                    <NavLink href="/login">Войти</NavLink>
+                }
+            </div>
+        </div>
     </aside>
     <main class="content">
         @Body
     </main>
 </div>
+
+@code {
+    private bool IsAuthenticated => !string.IsNullOrWhiteSpace(Auth.AccessToken);
+    private string AccountLabel => Auth.CurrentUser?.FullName ?? (IsAuthenticated ? "Аккаунт" : "Вход");
+
+    protected override async Task OnInitializedAsync()
+    {
+        Auth.Changed += OnAuthChanged;
+        await Auth.LoadAsync();
+    }
+
+    private async Task LogoutAsync()
+    {
+        await Auth.LogoutAsync();
+        Nav.NavigateTo("/login", replace: true);
+    }
+
+    private void OnAuthChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        Auth.Changed -= OnAuthChanged;
+    }
+}

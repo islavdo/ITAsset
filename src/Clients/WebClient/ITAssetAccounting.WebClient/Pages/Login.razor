@@ -21,6 +21,8 @@
 </div>
 
 @code {
+    [SupplyParameterFromQuery] public string? ReturnUrl { get; set; }
+
     private string email = "admin@it.local";
     private string password = "Admin123!";
     private string? error;
@@ -35,6 +37,16 @@
             return;
         }
         await Auth.SetAsync(token);
-        Nav.NavigateTo("/");
+        Nav.NavigateTo(GetSafeReturnUrl());
+    }
+
+    private string GetSafeReturnUrl()
+    {
+        if (string.IsNullOrWhiteSpace(ReturnUrl) || !ReturnUrl.StartsWith('/') || ReturnUrl.StartsWith("//"))
+        {
+            return "/";
+        }
+
+        return ReturnUrl;
     }
 }

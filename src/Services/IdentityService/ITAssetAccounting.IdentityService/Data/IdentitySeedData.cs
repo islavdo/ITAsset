@@ -9,13 +9,23 @@ public static class IdentitySeedData
 {
     public static async Task SeedAsync(IdentityDbContext db, AuthService authService)
     {
-        if (await db.Users.AnyAsync())
-        {
-            return;
-        }
+        await CreateIfMissingAsync(db, authService, "System Administrator", "admin@it.local", "Admin123!", "IT", new[] { UserRole.Admin, UserRole.ItSpecialist, UserRole.Manager });
+        await CreateIfMissingAsync(db, authService, "IT Specialist", "it@it.local", "Admin123!", "IT", new[] { UserRole.ItSpecialist });
+        await CreateIfMissingAsync(db, authService, "Employee Demo", "employee@it.local", "Admin123!", "Accounting", new[] { UserRole.Employee });
+    }
 
-        await authService.CreateUserAsync("System Administrator", "admin@it.local", "Admin123!", "IT", new[] { UserRole.Admin, UserRole.ItSpecialist, UserRole.Manager });
-        await authService.CreateUserAsync("IT Specialist", "it@it.local", "Admin123!", "IT", new[] { UserRole.ItSpecialist });
-        await authService.CreateUserAsync("Employee Demo", "employee@it.local", "Admin123!", "Accounting", new[] { UserRole.Employee });
+    private static async Task CreateIfMissingAsync(
+        IdentityDbContext db,
+        AuthService authService,
+        string fullName,
+        string email,
+        string password,
+        string department,
+        IEnumerable<UserRole> roles)
+    {
+        if (!await db.Users.AnyAsync(u => u.Email == email))
+        {
+            await authService.CreateUserAsync(fullName, email, password, department, roles);
+        }
     }
 }

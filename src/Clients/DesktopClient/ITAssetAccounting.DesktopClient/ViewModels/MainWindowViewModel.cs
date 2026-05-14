@@ -55,7 +55,7 @@ public class MainWindowViewModel : INotifyPropertyChanged
 public class AsyncCommand : ICommand
 {
     private readonly Func<Task> _execute;
-    public event EventHandler? CanExecuteChanged;
+    public event EventHandler? CanExecuteChanged { add { } remove { } }
     public AsyncCommand(Func<Task> execute) { _execute = execute; }
     public bool CanExecute(object? parameter) => true;
     public async void Execute(object? parameter) => await _execute();

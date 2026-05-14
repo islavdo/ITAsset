@@ -29,7 +29,7 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-Directory.CreateDirectory("data");
+Directory.CreateDirectory("App_Data");
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();

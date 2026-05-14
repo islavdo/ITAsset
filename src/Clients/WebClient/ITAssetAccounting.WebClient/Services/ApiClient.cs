@@ -19,10 +19,9 @@ public class ApiClient
 
     private void ApplyToken()
     {
-        if (!string.IsNullOrWhiteSpace(_auth.AccessToken))
-        {
-            _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _auth.AccessToken);
-        }
+        _http.DefaultRequestHeaders.Authorization = string.IsNullOrWhiteSpace(_auth.AccessToken)
+            ? null
+            : new AuthenticationHeaderValue("Bearer", _auth.AccessToken);
     }
 
     public async Task<TokenResponse?> LoginAsync(LoginRequest request)

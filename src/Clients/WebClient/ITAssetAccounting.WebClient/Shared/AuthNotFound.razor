@@ -1,0 +1,41 @@
+@inject AuthState Auth
+@inject NavigationManager Nav
+
+@if (!isReady)
+{
+    <LayoutView Layout="@DefaultLayout">
+        <div class="card">Проверка входа...</div>
+    </LayoutView>
+}
+else if (isAuthenticated)
+{
+    <LayoutView Layout="@DefaultLayout">
+        <div class="card"><h2>Страница не найдена</h2></div>
+    </LayoutView>
+}
+else
+{
+    <LayoutView Layout="@DefaultLayout">
+        <div class="card">Переход к форме входа...</div>
+    </LayoutView>
+}
+
+@code {
+    [Parameter] public Type? DefaultLayout { get; set; }
+
+    private bool isReady;
+    private bool isAuthenticated;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Auth.LoadAsync();
+        isAuthenticated = !string.IsNullOrWhiteSpace(Auth.AccessToken);
+
+        if (!isAuthenticated)
+        {
+            Nav.NavigateTo("/login", replace: true);
+        }
+
+        isReady = true;
+    }
+}

@@ -9,7 +9,7 @@
     <ProjectReference Include="../../../BuildingBlocks/ITAssetAccounting.Infrastructure/ITAssetAccounting.Infrastructure.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.ReverseProxy" Version="2.*" />
+    <PackageReference Include="Yarp.ReverseProxy" Version="2.*" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.*" />
   </ItemGroup>
 </Project>

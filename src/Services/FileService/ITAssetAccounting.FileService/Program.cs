@@ -23,7 +23,7 @@ builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy.Al
 
 var app = builder.Build();
 
-Directory.CreateDirectory("data");
+Directory.CreateDirectory("App_Data");
 Directory.CreateDirectory(builder.Configuration["FileStorage:RootPath"] ?? "storage");
 using (var scope = app.Services.CreateScope())
 {

@@ -69,12 +69,12 @@ public class AuthService
 
         var (access, expires) = _jwt.CreateAccessToken(user);
         var refresh = _jwt.CreateRefreshToken();
-        user.RefreshTokens.Add(new RefreshToken
+        await _db.RefreshTokens.AddAsync(new RefreshToken
         {
             UserId = user.Id,
             TokenHash = JwtTokenService.HashRefreshToken(refresh),
             ExpiresAtUtc = DateTime.UtcNow.AddDays(_options.RefreshTokenDays)
-        });
+        }, ct);
         await _db.SaveChangesAsync(ct);
 
         return new TokenResponse(access, refresh, expires, ToDto(user));
@@ -94,12 +94,12 @@ public class AuthService
 
         token.RevokedAtUtc = DateTime.UtcNow;
         var newRefresh = _jwt.CreateRefreshToken();
-        token.User.RefreshTokens.Add(new RefreshToken
+        await _db.RefreshTokens.AddAsync(new RefreshToken
         {
             UserId = token.UserId,
             TokenHash = JwtTokenService.HashRefreshToken(newRefresh),
             ExpiresAtUtc = DateTime.UtcNow.AddDays(_options.RefreshTokenDays)
-        });
+        }, ct);
 
         var (access, expires) = _jwt.CreateAccessToken(token.User);
         await _db.SaveChangesAsync(ct);
@@ -111,7 +111,7 @@ public class AuthService
         user.FullName,
         user.Email,
         user.Department,
-        user.UserRoles.Select(ur => ur.Role.Name).ToArray(),
+        user.UserRoles.Select(ur => ur.Role is null ? (UserRole)ur.RoleId : ur.Role.Name).ToArray(),
         user.CreatedAtUtc,
         user.IsActive);
 }

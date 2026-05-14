@@ -1,0 +1,48 @@
+@inject AuthState Auth
+@inject NavigationManager Nav
+
+@if (!isReady)
+{
+    <LayoutView Layout="@DefaultLayout">
+        <div class="card">Проверка входа...</div>
+    </LayoutView>
+}
+else if (isLoginPage || isAuthenticated)
+{
+    <RouteView RouteData="@RouteData" DefaultLayout="@DefaultLayout" />
+}
+else
+{
+    <LayoutView Layout="@DefaultLayout">
+        <div class="card">Переход к форме входа...</div>
+    </LayoutView>
+}
+
+@code {
+    [Parameter, EditorRequired] public RouteData RouteData { get; set; } = default!;
+    [Parameter] public Type? DefaultLayout { get; set; }
+
+    private bool isReady;
+    private bool isLoginPage;
+    private bool isAuthenticated;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isReady = false;
+        await Auth.LoadAsync();
+
+        isLoginPage = RouteData.PageType == typeof(ITAssetAccounting.WebClient.Pages.Login);
+        isAuthenticated = !string.IsNullOrWhiteSpace(Auth.AccessToken);
+
+        if (!isLoginPage && !isAuthenticated)
+        {
+            var relativePath = Nav.ToBaseRelativePath(Nav.Uri);
+            var returnUrl = string.IsNullOrWhiteSpace(relativePath)
+                ? "/"
+                : "/" + relativePath;
+            Nav.NavigateTo($"/login?returnUrl={Uri.EscapeDataString(returnUrl)}", replace: true);
+        }
+
+        isReady = true;
+    }
+}

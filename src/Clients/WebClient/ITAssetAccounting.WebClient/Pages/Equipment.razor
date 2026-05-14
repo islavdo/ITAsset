@@ -1,8 +1,55 @@
 @page "/equipment"
+@implements IAsyncDisposable
 @inject ApiClient Api
 @inject AuthState Auth
+@inject IJSRuntime JS
 
 <h1>Оборудование</h1>
+<div class="card scanner-card">
+    <h2>COM-сканер штрихкодов</h2>
+    <div class="toolbar">
+        <button class="secondary" type="button" disabled="@isScannerConnecting" @onclick="ConnectScannerAsync">
+            @(isScannerConnected ? "Сканер подключен" : isScannerConnecting ? "Подключение..." : "Подключить COM-сканер")
+        </button>
+        <span class="scanner-status">@scannerStatus</span>
+    </div>
+    @if (!string.IsNullOrWhiteSpace(lastScannedCode))
+    {
+        <p class="scanner-last-code">Последний код: <strong>@lastScannedCode</strong></p>
+    }
+    @if (scannedEquipment is not null)
+    {
+        <div class="scanner-result">
+            <span class="scanner-result-label">Найдено оборудование</span>
+            <strong>@scannedEquipment.Name</strong>
+            <span>@scannedEquipment.InventoryNumber · @scannedEquipment.Model · @scannedEquipment.LocationName</span>
+        </div>
+    }
+    else if (!string.IsNullOrWhiteSpace(lastScannedCode) && scanCompleted)
+    {
+        <div class="scanner-result scanner-result-empty">
+            Оборудование с таким инвентарным кодом не найдено. Код уже подставлен в форму добавления.
+        </div>
+    }
+</div>
+
+@if (showMissingEquipmentDialog)
+{
+    <div class="scan-dialog-backdrop" role="presentation">
+        <div class="scan-dialog" role="dialog" aria-modal="true" aria-labelledby="scan-missing-title">
+            <span class="scanner-result-label">Сканирование</span>
+            <h2 id="scan-missing-title">Оборудование не найдено</h2>
+            <p>
+                Инвентаризационный код <strong>@lastScannedCode</strong> отсутствует в списке.
+                Код уже подставлен в форму добавления.
+            </p>
+            <div class="scan-dialog-actions">
+                <button class="secondary" type="button" @onclick="DismissMissingEquipmentDialog">Закрыть</button>
+            </div>
+        </div>
+    </div>
+}
+
 <div class="card">
     <div class="toolbar">
         <input placeholder="Поиск по названию, модели, инв. номеру" @bind="filter.Search" />
@@ -35,7 +82,7 @@
     </div>
 </div>
 
-<div class="card">
+<div class="card" id="add-equipment-card">
     <h2>Добавить оборудование</h2>
     <EditForm Model="create" OnValidSubmit="CreateAsync">
         <div class="form-grid">
@@ -62,6 +109,16 @@
     private IReadOnlyCollection<CategoryDto> categories = Array.Empty<CategoryDto>();
     private IReadOnlyCollection<LocationDto> locations = Array.Empty<LocationDto>();
     private EquipmentForm create = new();
+    private DotNetObjectReference<Equipment>? scannerReference;
+    private bool scannerInitialized;
+    private bool isScannerConnecting;
+    private bool isScannerConnected;
+    private string scannerStatus = "Подключите COM-порт сканера один раз, затем просто сканируйте коды.";
+    private string? lastScannedCode;
+    private EquipmentDto? scannedEquipment;
+    private bool scanCompleted;
+    private bool showMissingEquipmentDialog;
+    private int scanVersion;
     private int totalPages = 1;
     private string? error;
 
@@ -73,6 +130,29 @@
         if (categories.Any()) create.CategoryId = categories.First().Id;
         if (locations.Any()) create.LocationId = locations.First().Id;
         await LoadAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        scannerReference = DotNetObjectReference.Create(this);
+        scannerInitialized = await JS.InvokeAsync<bool>("itAssetSerialScanner.initialize", scannerReference);
+        if (!scannerInitialized)
+        {
+            scannerStatus = "COM-режим доступен в Chrome/Edge через Web Serial API.";
+            StateHasChanged();
+            return;
+        }
+
+        isScannerConnected = await JS.InvokeAsync<bool>("itAssetSerialScanner.autoConnect");
+        scannerStatus = isScannerConnected
+            ? "Сканер подключен. Сканируйте код без дополнительных действий."
+            : "Нажмите подключение и выберите COM-порт сканера.";
+        StateHasChanged();
     }
 
     private async Task LoadAsync()
@@ -90,6 +170,76 @@
             error = "Ошибка загрузки: " + ex.Message;
         }
     }
+
+    private async Task ConnectScannerAsync()
+    {
+        if (!scannerInitialized)
+        {
+            return;
+        }
+
+        isScannerConnecting = true;
+        scannerStatus = "Выберите COM-порт сканера в окне браузера.";
+        try
+        {
+            isScannerConnected = await JS.InvokeAsync<bool>("itAssetSerialScanner.connect");
+            scannerStatus = isScannerConnected
+                ? "Сканер подключен. Сканируйте код без дополнительных действий."
+                : "Сканер не подключен.";
+        }
+        catch (Exception ex)
+        {
+            scannerStatus = "Не удалось подключить сканер: " + ex.Message;
+        }
+        finally
+        {
+            isScannerConnecting = false;
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnBarcodeScanned(string code)
+    {
+        code = code.Trim();
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            return;
+        }
+
+        var currentScanVersion = ++scanVersion;
+        lastScannedCode = code;
+        scannedEquipment = null;
+        scanCompleted = false;
+        showMissingEquipmentDialog = false;
+        filter.Search = code;
+        filter.Page = 1;
+        create.InventoryNumber = code;
+        items = new();
+        totalPages = 1;
+        scannerStatus = "Код принят. Ищу оборудование...";
+        await InvokeAsync(StateHasChanged);
+
+        await LoadAsync();
+        if (currentScanVersion != scanVersion)
+        {
+            return;
+        }
+
+        scannedEquipment = items.FirstOrDefault(item =>
+            string.Equals(item.InventoryNumber, code, StringComparison.OrdinalIgnoreCase));
+        scanCompleted = true;
+        showMissingEquipmentDialog = scannedEquipment is null;
+        scannerStatus = scannedEquipment is null
+            ? "Оборудование не найдено. Код подставлен в форму добавления."
+            : $"Найдено: {scannedEquipment.Name}.";
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void DismissMissingEquipmentDialog()
+    {
+        showMissingEquipmentDialog = false;
+    }
+
     private async Task Prev() { filter.Page--; await LoadAsync(); }
     private async Task Next() { filter.Page++; await LoadAsync(); }
     private async Task CreateAsync()
@@ -114,5 +264,15 @@
         public int CategoryId { get; set; }
         public int LocationId { get; set; }
         public decimal? Price { get; set; }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (scannerInitialized)
+        {
+            await JS.InvokeVoidAsync("itAssetSerialScanner.dispose");
+        }
+
+        scannerReference?.Dispose();
     }
 }
